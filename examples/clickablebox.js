@@ -18,9 +18,11 @@ $().ready(function () {
     var Bacon = BaconTracer.proxyObject(window.Bacon);
     Bacon.BaconName = "TopBacon";
 
-    var blockDragging = block.asEventStream('mousedown')
-        .map(true)
-        .merge(html.asEventStream('mouseup').map(false))
+    var mouseDownES = block.asEventStream('mousedown').map(true);
+    mouseDownES.BaconName = "mouseDownES";
+    var mouseUpES = html.asEventStream('mouseup').map(false);
+    mouseUpES.BaconName = "mouseUpES";
+    var blockDragging = mouseDownES.merge(mouseUpES)
         .toProperty(false);
     blockDragging.BaconName = "blockDragging";
     console.log(blockDragging.BaconName, blockDragging.BaconInputs);
@@ -47,19 +49,15 @@ $().ready(function () {
 
     // Uncomment the lines below to see some more examples
     // Experiment with Bus
-    // var bBus = new Bacon.Bus();
-    // bBus.BaconName = "bBus";
-    // console.log(bBus.BaconName, bBus.BaconInputs);
-    // bBus.plug(deltas);
-    // console.log(bBus.BaconName, bBus.BaconInputs);
+    var bBus = new Bacon.Bus();
+    bBus.BaconName = "bBus";
+    console.log(bBus.BaconName, bBus.BaconInputs);
+    bBus.plug(deltas);
+    console.log(bBus.BaconName, bBus.BaconInputs);
 
     // Experiment with EventStreams
-    // var mouseDownES = block.asEventStream('mousedown').map(true);
-    // mouseDownES.BaconName = "mouseDownES";
-    // var mouseUpES = html.asEventStream('mouseup').map(false);
-    // mouseUpES.BaconName = "mouseUpES";
-    // var foo = mouseUpES.merge(mouseDownES);
-    // foo.BaconName = "foo";
+    var foo = mouseUpES.merge(mouseDownES);
+    foo.BaconName = "foo";
     
     BaconTracer.drawRelationshipsForce("#graph");
 });

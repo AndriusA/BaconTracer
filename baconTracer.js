@@ -20,7 +20,6 @@
   var counter = 0;
   var BaconMap = {};
 
-  BaconMap[counter++] = {BaconID: counter, BaconName: "TOPLEVEL"};
   this.BaconTracer = BaconTracer = {}
   this.Relationships = Relationships = {}
 
@@ -108,14 +107,12 @@
             var elementBaconID = counter++;
             BaconMap[elementBaconID] = {BaconID: elementBaconID, BaconName: this.selector, generator: arguments[0]};
             addRelationship(proxy.BaconID, elementBaconID);
-            addRelationship(elementBaconID, 0);
           }
 
           else if (targetName === "fromEventTarget") {
             var elementBaconID = counter++;
             BaconMap[elementBaconID] = {BaconID: elementBaconID, BaconName: this.selector, generator: arguments[0]};
             addRelationship(proxy.BaconID, elementBaconID);
-            addRelationship(elementBaconID, 0);
           }
 
           // this.BaconID is the same as proxy.BaconID for valueOf method
@@ -129,9 +126,9 @@
           return proxy;
         }
 
-        // if the passed object is Bacon.Bus and the result is not a Bacon type,
+        // if the passed object is Bacon.Bus and we are plugging into it,
         // assume arguments go into the bus
-        if (this instanceof Bacon.Bus) {
+        if (this instanceof Bacon.Bus && targetName == "plug") {
           for (arg in arguments){
             var argument = arguments[arg];
             if (BaconInstance(argument))
@@ -166,10 +163,14 @@
   }
 
   function addRelationship(target, source) {
-    if (Relationships[source])
-      Relationships[source].push(target)
+    if (Relationships[source]) 
+      Relationships[source].push(target);
     else 
       Relationships[source] = [target];
+    if (BaconMap[target].inNodes)
+      BaconMap[target].inNodes++;
+    else
+      BaconMap[target].inNodes = 1;
   }
 
   // Override "asEventStream" of jquery to trap when Bacon EventStreams are created for HTML interaction
@@ -196,8 +197,20 @@
       }
     }
     links.forEach(function(link) {
-      link.source = nodes[link.source] || (nodes[link.source] = {id: link.source, name: BaconMap[link.source].BaconName, generator: BaconMap[link.source].generator});
-      link.target = nodes[link.target] || (nodes[link.target] = {id: link.target, name: BaconMap[link.target].BaconName, generator: BaconMap[link.target].generator});
+      link.source = nodes[link.source] ||
+        (nodes[link.source] = {
+          id: link.source, 
+          name: BaconMap[link.source].BaconName, 
+          generator: BaconMap[link.source].generator, 
+          inNodes: BaconMap[link.source].inNodes
+        });
+      link.target = nodes[link.target] || 
+        (nodes[link.target] = {
+          id: link.target, 
+          name: BaconMap[link.target].BaconName, 
+          generator: BaconMap[link.target].generator, 
+          inNodes: BaconMap[link.target].inNodes
+        });
     });
     return {nodes: nodes, links: links};
   }
@@ -236,8 +249,6 @@
         force.links(links);
         force.nodes(d3.values(nodes));
         force.on("tick", tick)
-
-        var rootNode = force.nodes()[0];
         
         var markers = defs.selectAll("marker")
             .data(force.links().map(function(d){ return d.target.id+"-"+d.source.id}), function(d){ return d;});
@@ -295,19 +306,19 @@
 
         force.start();
 
-        // Use elliptical arc path segments to doubly-encode directionality.
         function tick() {
             var nodes = force.nodes();
+            // constraints for rendering
             for (i in nodes) {
               if ((!Relationships[nodes[i].id] || Relationships[nodes[i].id].length === 0))
                 nodes[i].x = width-margin.right;
+              if (!nodes[i].inNodes || nodes[i].inNodes === 0)
+                nodes[i].x = margin.left;
             }
-            rootNode.x = 0;
-            rootNode.y = height/2;
             for (i in force.nodes())
             path.attr("d", function(d) {
                 var dx = d.source.x - d.target.x,
-                // Can also use curvature... choosing to use none
+                // Can also use eliptical path segments to doubly encode directionality... choosing to use none
                 dy = 0,//d.source.y - d.target.y,
                 dr = 0;//Math.sqrt(dx * dx + dy * dy);
                 return "M" + d.target.x + "," + d.target.y + "A" + dr + "," + dr + " 0 0,1 " + d.source.x + "," + d.source.y;
